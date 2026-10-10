@@ -185,7 +185,7 @@ button.ghost{padding:8px 12px;font-weight:500;color:var(--accent);border-style:d
       <span class="lbl" id="dayLabel"></span>
     </div>
     <div class="brew" id="brew"></div>
-    <p class="note">鍋煮茶低於 1、冬露低於 0.3 就要煮。<br>奶蓋看明天：平日海鹽低於 1.5、蕎麥低於 1；假日海鹽低於 1、蕎麥低於 0.5。明天是平日還是假日由系統自動判斷。</p>
+    <p class="note">鍋煮茶小於等於 1、冬露低於 0.3 就要煮。<br>奶蓋看明天：平日海鹽低於 1.5、蕎麥低於 1；假日海鹽低於 1、蕎麥低於 0.5。明天是平日還是假日由系統自動判斷。</p>
     <label class="f">其他要煮（選填）<input type="text" id="brewExtra" placeholder="例：多煮兩倍蕎麥"></label>
     <div class="lbl">提醒對象（點選，可多選）</div>
     <div class="chips" id="tags"></div>
@@ -228,7 +228,7 @@ const LISTS=[
  {t:"2. 歸位",items:[
   ["茶桶歸位","照順序擺放整齊（右：冬／秋／春，左：綠／夏／紅）"],
   ["IH 爐放置大、中鍋","請放置乾淨、沒有燒焦痕跡的鍋子"],
-  ["磅秤充電"]]},
+  ["磅秤、音響充電"]]},
  {t:"3. 冰箱與食安檢查",items:[
   ["冰箱工作台沒有留當日飲料、食物"],
   ["確認冰箱物料效期","即期須立即報廢"],
@@ -355,7 +355,8 @@ const num=id=>{const v=$(id).value.trim();return v===""||isNaN(+v)?null:+v};
 function brewList(){
  const t=autoType,out=[];
  for(const k in INV)INV[k].forEach(([n,,wd,we])=>{const v=num(`i_${k}_${n}`);const lim=t==="we"?we:wd;
-  const low=v!==null&&v<lim;$(`L_${k}_${n}`).classList.toggle("low",low);if(low)out.push(n)});
+  const potTea=k==="tea"&&n!=="冬露";
+  const low=v!==null&&(potTea?v<=lim:v<lim);$(`L_${k}_${n}`).classList.toggle("low",low);if(low)out.push(n)});
  return out;
 }
 
