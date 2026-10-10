@@ -200,7 +200,7 @@ main section{scroll-margin-top:84px}
   </section>
 
   <section>
-    <h2>茶況與鍋煮茶庫存 <span class="req">*</span></h2>
+    <h2>冰箱庫存 <span class="req">*</span></h2>
     <div class="inv" id="inv-tea"></div>
     <h2 style="margin-top:6px">奶蓋 <span class="req">*</span></h2>
     <div class="inv" id="inv-foam"></div>
@@ -249,8 +249,8 @@ main section{scroll-margin-top:84px}
   <div class="cheer-card">
     <img class="cheer-cat" id="cheerCat" src="cat.webp?v=2" alt="跳舞的小貓" hidden>
     <img class="cheer-cat sad" id="cheerSad" src="sad.webp?v=3" alt="疑惑的貓" hidden>
-    <audio id="cheerSnd" src="cat.mp3?v=2" preload="auto" loop></audio>
-    <audio id="sadSnd" src="sad.mp3?v=3" preload="auto" loop></audio>
+    <audio id="cheerSnd" src="cat.mp3?v=2" preload="auto"></audio>
+    <audio id="sadSnd" src="sad.mp3?v=3" preload="auto"></audio>
     <div class="cheer-mark" id="cheerMark" aria-hidden="true">😊</div>
     <h2 id="cheerTitle">今天辛苦了！</h2>
     <p id="cheerSub"></p>
@@ -472,7 +472,7 @@ function render(){
  const expLines=[...dlvLines,...(other||xName?[`其他錢櫃支出：${xName||"（未填品項）"} $${fmt(other)}`]:[])];
  if(expLines.length)m+=`\n▍支出細項\n${expLines.join("\n")}\n`;
  m+=`\n${tagLine?tagLine+"\n":""}${brewAll.length?`明天${t==="we"?"假日":"平日"}要煮：`+brewAll.join("、"):`明天${t==="we"?"假日":"平日"}不用特別煮`}`;
- m+=`\n\n▍茶況與鍋煮茶庫存\n${inv("tea")}\n-\n${inv("foam")}`;
+ m+=`\n\n▍冰箱庫存\n${inv("tea")}\n-\n${inv("foam")}`;
  const ords=st.orders.map(o=>{const its=o.items.filter(x=>x.cups||x.item).map(x=>`${x.cups}杯${x.item}`);
   return (o.no||o.time||its.length)?`你訂${o.no} ${o.time} ${its.join("、")}`.trim():null}).filter(Boolean);
  if(ords.length)m+=`\n\n▍外送訂單備註\n${ords.join("\n")}`;
@@ -500,7 +500,8 @@ $("copy").onclick=()=>{
  if(p.length){
   ts.className="toast err";ts.innerHTML=`<span>還沒填：${esc(p.join("；"))}</span><button type="button" class="go-fix" id="goFix">前往填寫 ↑</button>`;
   $("goFix").onclick=goMissing;return}
- {const s=$(all.every(a=>$(a.id).checked)?"cheerSnd":"sadSnd");try{s.currentTime=0;const pr=s.play();if(pr)pr.catch(()=>{})}catch(e){}}
+ {const done=all.every(a=>$(a.id).checked);restartAnim(done?"cheerCat":"cheerSad");
+  const s=$(done?"cheerSnd":"sadSnd");try{s.currentTime=0;const pr=s.play();if(pr)pr.catch(()=>{})}catch(e){}}
  const t=$("msg").textContent;
  const okMsg=()=>{ts.className="toast";ts.textContent="已複製，到 LINE 群組貼上即可";celebrate()};
  const selectMsg=()=>{const r=document.createRange();r.selectNodeContents($("msg"));const s=getSelection();s.removeAllRanges();s.addRange(r);ts.className="toast";ts.textContent="已選取文字，請長按複製";["cheerSnd","sadSnd"].forEach(id=>{try{$(id).pause()}catch(e){}})};
@@ -510,6 +511,17 @@ $("copy").onclick=()=>{
  if(done){okMsg();return}
  if(navigator.clipboard)navigator.clipboard.writeText(t).then(okMsg).catch(selectMsg);else selectMsg();
 };
+// 動畫和聲音同步：每次都讓動畫從第一格重新開始
+const animBlob={};
+["cheerCat","cheerSad"].forEach(id=>{try{fetch($(id).getAttribute("src")).then(r=>r.ok?r.blob():null).then(b=>{if(b)animBlob[id]=b}).catch(()=>{})}catch(e){}});
+function restartAnim(id){
+ const b=animBlob[id];if(!b)return;const el=$(id),old=el.dataset.url;
+ try{const u=URL.createObjectURL(b);el.src=u;el.dataset.url=u;if(old)setTimeout(()=>URL.revokeObjectURL(old),2000)}catch(e){}
+}
+// 每播完一輪就讓動畫和聲音一起從頭開始，避免越播越不同步
+[["cheerSnd","cheerCat"],["sadSnd","cheerSad"]].forEach(([a,img])=>$(a).addEventListener("ended",()=>{
+ if($("cheer").hidden)return;restartAnim(img);const s=$(a);try{s.currentTime=0;const pr=s.play();if(pr)pr.catch(()=>{})}catch(e){}
+}));
 const imgOK={};
 ["cheerCat","cheerSad"].forEach(id=>{const ci=$(id);imgOK[id]=ci.complete?ci.naturalWidth>0:null;
  ci.addEventListener("load",()=>imgOK[id]=true);
