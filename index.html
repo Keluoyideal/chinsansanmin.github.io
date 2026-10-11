@@ -63,6 +63,7 @@ h2{font-size:.85rem;letter-spacing:.08em;color:var(--muted);margin:0;font-weight
 .item input:checked::after{content:"";width:6px;height:11px;border:solid var(--surface);border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-1px,-1px)}
 .item span{min-width:0}
 .item.done span{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.item em.opt{font-style:normal;font-size:.7rem;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:2px}
 .item small{display:block;color:var(--muted);font-size:.8rem}
 .must h2{color:var(--warn)}
 .must .items{border-color:var(--warn);background:var(--warn-soft)}
@@ -143,6 +144,15 @@ button.ghost{padding:8px 12px;font-weight:500;color:var(--accent);border-style:d
 .toast.err{color:var(--warn);display:flex;flex-direction:column;align-items:flex-start;gap:8px}
 button.go-fix{padding:8px 14px;font-size:.9rem;background:var(--warn);border-color:var(--warn);color:var(--surface)}
 .note{font-size:.8rem;color:var(--muted);margin:0}
+.bar-right{display:flex;align-items:baseline;gap:10px;flex:none}
+.sync{font-size:.72rem;font-weight:700;color:var(--muted);white-space:nowrap}
+.sync::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:4px;vertical-align:1px}
+.sync.on{color:var(--accent)}
+.sync.err{color:var(--warn)}
+.sec-right{display:flex;align-items:center;gap:8px;flex:none}
+.sec-count{font-size:.8rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 10px;white-space:nowrap}
+.sec-count.full{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.must .sec-count.full{background:var(--warn);border-color:var(--warn)}
 main.wrap{padding-block-end:120px}
 main section{scroll-margin-top:84px}
 .todo-bar{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -4px 16px color-mix(in srgb,var(--fg) 10%,transparent);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
@@ -173,7 +183,7 @@ main section{scroll-margin-top:84px}
 </style>
 
 <div class="bar"><div class="wrap" style="padding-block:0;gap:0">
-  <div class="bar-row"><h1>晚班收班 Checklist</h1><span class="count" id="count">0/0</span></div>
+  <div class="bar-row"><h1>晚班收班 Checklist</h1><span class="bar-right"><span class="sync" id="syncState" hidden></span><span class="count" id="count">0/0</span></span></div>
   <div class="track"><div class="fill" id="fill"></div></div>
 </div></div>
 
@@ -276,14 +286,20 @@ const LISTS=[
   ["後場煮茶區清潔","先掃地再拖地，勿留茶漬"],
   ["倒廚具瀝水桶廢水"],
   ["IH 爐檯面擦拭","煮料、煮珍珠溢出需擦拭乾淨"],
+  ["擦拭微波爐"],
   ["果汁檯面清潔","洞洞板刷洗、溝槽及檯面擦拭"],
   ["封膜機清潔","需拆開清洗，勿留茶漬"],
   ["量杯、微波碗、配料盒清洗","需刷洗後放置檯面晾乾"],
   ["冰槽刷洗","刷洗後用熱水燙過"]]},
- {t:"2. 歸位",items:[
+ {t:"2. 歸位與補貨",items:[
   ["茶桶歸位","照順序擺放整齊（右：冬／秋／春，左：綠／夏／紅）"],
+  ["檢查茶桶茶嘴是否鎖緊"],
   ["IH 爐放置大、中鍋","請放置乾淨、沒有燒焦痕跡的鍋子"],
-  ["磅秤、音響充電"]]},
+  ["磅秤、音響充電"],
+  ["補糖機","","opt"],
+  ["補大杯、中杯","","opt"],
+  ["補吸管","","opt"],
+  ["疊杯架","","opt"]]},
  {t:"3. 冰箱與食安檢查",items:[
   ["冰箱工作台沒有留當日飲料、食物"],
   ["確認冰箱物料效期","即期須立即報廢"],
@@ -292,7 +308,8 @@ const LISTS=[
  {t:"4. 垃圾與地面",items:[
   ["倒回收垃圾、一般垃圾、茶葉廚餘","關門拿到門口區擺放，並換上新垃圾袋"],
   ["抹布泡酵素","黑色抹布泡小鐵桶"],
-  ["確實掃地、拖地","最後做，避免再弄髒"]]},
+  ["確實掃地、拖地","最後做，避免再弄髒"],
+  ["倒拖把水"]]},
  {t:"5. 結帳與交接",items:[
   ["清點零錢櫃 10,000 零用金"],["列印交班報表並執行營收歸檔"],["營收、作廢發票、交班報表放入營收袋"]]},
  {t:"⚠️ 離開前一定要關",must:true,items:[["冷氣"],["空氣門"],["鳥叫聲"],["電風扇"],["電燈"],["茶機"],["煮茶計時器"],["冰箱燈與除霧"],["封膜機"],["倉庫鐵門"]]}
@@ -309,7 +326,9 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let st={};
 try{st=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}};
+const saveLocal=()=>{try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}};
+let onSave=null;
+const save=()=>{saveLocal();if(onSave)onSave()};
 
 // 營業日：台北時間，凌晨 5 點前算前一天
 const bd=new Date(Date.now()+(8-5)*3600e3);
@@ -343,10 +362,11 @@ save();
 
 // checklist
 const all=[];
-$("lists").innerHTML=LISTS.map((g,gi)=>`<section class="grp ${g.must?'must':''}" id="g${gi}" style="margin-bottom:22px"><div class="sec-head"><h2>${g.t}</h2><button type="button" class="all" data-g="${gi}">整區完成</button></div><div class="items">${
- g.items.map((it,ii)=>{const id=`c${gi}_${ii}`;all.push({id,g:gi,name:g.must?"關"+it[0]:it[0]});
-  return `<label class="item" for="${id}"><input type="checkbox" id="${id}"><span>${it[0]}${it[1]?`<small>${it[1]}</small>`:""}</span></label>`}).join("")
+$("lists").innerHTML=LISTS.map((g,gi)=>`<section class="grp ${g.must?'must':''}" id="g${gi}" style="margin-bottom:22px"><div class="sec-head"><h2>${g.t}</h2><span class="sec-right"><span class="sec-count" id="gc${gi}">0 / 0</span><button type="button" class="all" data-g="${gi}">整區完成</button></span></div><div class="items">${
+ g.items.map((it,ii)=>{const id=`c${gi}_${ii}`;all.push({id,g:gi,opt:it[2]==="opt",name:g.must?"關"+it[0]:it[0]});
+  return `<label class="item" for="${id}"><input type="checkbox" id="${id}"><span>${it[0]}${it[2]==="opt"?` <em class="opt">選填</em>`:""}${it[1]?`<small>${it[1]}</small>`:""}</span></label>`}).join("")
 }</div><button type="button" class="open" data-g="${gi}" hidden></button></section>`).join("");
+const need=all.filter(a=>!a.opt);
 document.querySelectorAll("button.all").forEach(b=>b.onclick=()=>{
  const items=all.filter(a=>a.g==b.dataset.g);const on=!items.every(a=>$(a.id).checked);
  items.forEach(a=>{$(a.id).checked=on;st[a.id]=on});$("g"+b.dataset.g).classList.remove("show");save();render();
@@ -362,10 +382,10 @@ $("lists").addEventListener("change",e=>{
  const t=e.target;if(t.type!=="checkbox"||!t.checked)return;
  buzz();t.classList.remove("pop");void t.offsetWidth;t.classList.add("pop");
  const a=all.find(x=>x.id===t.id);
- if(a&&all.filter(x=>x.g===a.g).every(x=>$(x.id).checked))setTimeout(()=>goNext(a.g),350);
+ if(a&&all.filter(x=>x.g===a.g&&!x.opt).every(x=>$(x.id).checked))setTimeout(()=>goNext(a.g),350);
 });
 $("todoGo").onclick=()=>{
- const a=all.find(x=>!$(x.id).checked);if(!a)return;
+ const a=need.find(x=>!$(x.id).checked);if(!a)return;
  const row=$(a.id).closest(".item");
  row.scrollIntoView({behavior:calm()?"auto":"smooth",block:"center"});
  row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash");
@@ -435,18 +455,19 @@ function brewList(){
 }
 
 function render(){
- const done=all.filter(a=>$(a.id).checked);
+ const done=need.filter(a=>$(a.id).checked);
  all.forEach(a=>$(a.id).closest(".item").classList.toggle("done",$(a.id).checked));
  LISTS.forEach((g,gi)=>{
-  const sec=$("g"+gi),ok=all.filter(a=>a.g==gi).every(a=>$(a.id).checked),show=sec.classList.contains("show");
+  const sec=$("g"+gi),ok=all.filter(a=>a.g==gi&&!a.opt).every(a=>$(a.id).checked),show=sec.classList.contains("show");
+  {const req=all.filter(a=>a.g==gi&&!a.opt),d=req.filter(a=>$(a.id).checked).length,gc=$("gc"+gi);gc.textContent=`${d} / ${req.length}`;gc.classList.toggle("full",d===req.length)}
   sec.classList.toggle("collapsed",ok&&!show);
   const ob=sec.querySelector(".open");ob.hidden=!ok;ob.textContent=show?"收起":"✓ 這區已完成，點此查看";
   sec.querySelector(".all").textContent=ok?"取消勾選":(g.must?"全部已關":"整區完成");
  });
- $("count").textContent=`${done.length}/${all.length}`;
- const remain=all.length-done.length;
+ $("count").textContent=`${done.length}/${need.length}`;
+ const remain=need.length-done.length;
  $("todoBar").hidden=remain===0;$("todoText").textContent=`還差 ${remain} 項沒勾`;
- $("fill").style.width=(done.length/all.length*100)+"%";
+ $("fill").style.width=(done.length/need.length*100)+"%";
 
  const t=autoType;
  const brew=brewList();const extraBrew=$("brewExtra").value.trim();
@@ -455,11 +476,11 @@ function render(){
  const d=$("date").value.replace(/^\d{4}-/,"").replace("-","/");
  const ppl="";
  const crew=`收班人員：${$("who").value||"?"}、${$("who2").value||"?"}\n`;
- const miss=all.filter(a=>!$(a.id).checked).map(a=>a.name);
+ const miss=need.filter(a=>!$(a.id).checked).map(a=>a.name);
  const UNIT={tea:"壺",foam:"壺"};
  const inv=k=>INV[k].map(([n])=>{const v=$(`i_${k}_${n}`).value.trim();return `${n}：剩 ${v||"?"} ${UNIT[k]}`}).join("\n");
  let m=`【${d} 晚班收班】\n${crew}`;
- m+=miss.length?`收班檢查 ${done.length}/${all.length}，未完成：\n${miss.map(x=>"⚠️ "+x).join("\n")}\n`:`收班檢查 ${all.length}/${all.length} 全部完成 ✅\n`;
+ m+=miss.length?`收班檢查 ${done.length}/${need.length}，未完成：\n${miss.map(x=>"⚠️ "+x).join("\n")}\n`:`收班檢查 ${need.length}/${need.length} 全部完成 ✅\n`;
  const tagLine=st.tags.map(n=>"@"+LINE[n]).join(" ");
  const brewAll=[...brew,...(extraBrew?[extraBrew]:[])];
  const money=id=>{const v=$(id).value.replace(/[,\s$]/g,"");return v===""||isNaN(+v)?null:Math.round(+v)};
@@ -493,6 +514,96 @@ function render(){
 }
 render();
 
+// ===== 雙人同步（Firebase Realtime Database）=====
+// 填入資料庫網址就會開啟同步；留空則只存在各自手機
+const FB_URL="";
+const STORE="sanmin";
+// 不同步的欄位（金額只留在填表人的手機）
+const PRIVATE=k=>k==="day"||/^rev_|^x_|^d_/.test(k);
+(function(){
+ if(!FB_URL||typeof EventSource==="undefined"||typeof fetch==="undefined")return;
+ const base=FB_URL.replace(/\/+$/,"")+`/closing/${STORE}/${today}`;
+ const badge=$("syncState");badge.hidden=false;
+ const setStatus=t=>{badge.className="sync "+(t==="on"?"on":t==="err"?"err":"");
+  badge.textContent=t==="on"?"同步中":t==="err"?"未同步":"連線中…"};
+ setStatus("wait");
+ const isEmpty=v=>v==null||(Array.isArray(v)&&!v.length)||(typeof v==="object"&&!Object.keys(v).length);
+ const clean=v=>isEmpty(v)?null:v;
+ const norm=v=>JSON.stringify(clean(v===undefined?null:v));
+ const fixArr=v=>v==null?[]:Array.isArray(v)?v:Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]);
+ let remote={},ready=false,timer=null,pendingOrders=false,okTimer=null;
+ function push(){
+  if(!ready)return;
+  clearTimeout(timer);
+  timer=setTimeout(()=>{
+   const diff={};
+   new Set([...Object.keys(st),...Object.keys(remote)]).forEach(k=>{
+    if(PRIVATE(k))return;
+    const j=norm(st[k]);if(j!==(remote[k]||"null")){diff[k]=clean(st[k]===undefined?null:st[k]);remote[k]=j}
+   });
+   if(!Object.keys(diff).length)return;
+   fetch(base+".json",{method:"PATCH",body:JSON.stringify(diff)})
+    .then(r=>{if(!r.ok)throw 0;setStatus("on")}).catch(()=>setStatus("err"));
+  },250);
+ }
+ onSave=push;
+ function applyKey(k,v){
+  if(PRIVATE(k))return null;
+  const j=norm(v);if(j===(remote[k]||"null"))return null;
+  remote[k]=j;
+  if(k==="orders"){st.orders=fixArr(v).filter(Boolean).map(o=>({no:o.no||"",time:o.time||"",items:fixArr(o.items).filter(Boolean).map(x=>({cups:x.cups||"",item:x.item||""}))}));return k}
+  if(k==="tags"){st.tags=fixArr(v).filter(Boolean);return k}
+  if(v==null)delete st[k];else st[k]=v;
+  return k;
+ }
+ function refresh(keys){
+  if(!keys.length)return;
+  keys.forEach(k=>{
+   if(k==="orders"){if($("orders").contains(document.activeElement))pendingOrders=true;else drawOrders();return}
+   if(k==="tags"){document.querySelectorAll("#tags .chip").forEach(b=>b.setAttribute("aria-pressed",st.tags.includes(b.dataset.n)));return}
+   const el=document.getElementById(k);if(!el||el===document.activeElement)return;
+   if(el.type==="checkbox")el.checked=st[k]===undefined?el.defaultChecked:!!st[k];else el.value=st[k]===undefined?"":st[k];
+  });
+  saveLocal();render();
+ }
+ $("orders").addEventListener("focusout",()=>setTimeout(()=>{if(pendingOrders&&!$("orders").contains(document.activeElement)){pendingOrders=false;drawOrders();render()}},0));
+ function setPath(obj,parts,val){if(!parts.length)return val;const o=(obj&&typeof obj==="object")?JSON.parse(JSON.stringify(obj)):{};o[parts[0]]=setPath(o[parts[0]],parts.slice(1),val);return o}
+ function handle(type,path,data){
+  const parts=path.split("/").filter(Boolean);
+  const changed=[];
+  if(!parts.length){
+   if(type==="put"){
+    const d=data||{};
+    Object.keys(d).forEach(k=>{const c=applyKey(k,d[k]);if(c)changed.push(c)});
+    if(ready)Object.keys(remote).forEach(k=>{if(!(k in d)){const c=applyKey(k,null);if(c)changed.push(c)}});
+    refresh(changed);
+    if(!ready){ready=true;push()}
+   }else{
+    Object.keys(data||{}).forEach(k=>{const c=applyKey(k,data[k]);if(c)changed.push(c)});
+    refresh(changed);
+   }
+  }else{
+   const k=parts[0];
+   const cur=remote[k]?JSON.parse(remote[k]):null;
+   let v=parts.length===1?data:setPath(cur,parts.slice(1),data);
+   if(type==="patch"&&parts.length===1&&data&&typeof data==="object"&&cur&&typeof cur==="object")v=Object.assign({},cur,data);
+   const c=applyKey(k,v);if(c)refresh([c]);
+  }
+  setStatus("on");
+ }
+ let es;
+ function connect(){
+  try{es=new EventSource(base+".json")}catch(e){setStatus("err");return}
+  es.addEventListener("put",e=>{try{const m=JSON.parse(e.data);handle("put",m.path,m.data)}catch(x){}});
+  es.addEventListener("patch",e=>{try{const m=JSON.parse(e.data);handle("patch",m.path,m.data)}catch(x){}});
+  es.addEventListener("keep-alive",()=>setStatus("on"));
+  es.addEventListener("cancel",()=>setStatus("err"));
+  es.onerror=()=>setStatus(es.readyState===2?"err":"wait");
+ }
+ connect();
+ okTimer=setTimeout(()=>{if(!ready)setStatus("err")},10000);
+})();
+
 function problems(){
  const p=[];
  ["who","who2"].forEach(id=>$(id).classList.toggle("missing",!$(id).value));
@@ -512,7 +623,7 @@ $("copy").onclick=()=>{
  if(p.length){
   ts.className="toast err";ts.innerHTML=`<span>還沒填：${esc(p.join("；"))}</span><button type="button" class="go-fix" id="goFix">前往填寫 ↑</button>`;
   $("goFix").onclick=goMissing;return}
- {const done=all.every(a=>$(a.id).checked);restartAnim(done?"cheerCat":"cheerSad");
+ {const done=need.every(a=>$(a.id).checked);restartAnim(done?"cheerCat":"cheerSad");
   const s=$(done?"cheerSnd":"sadSnd");try{s.currentTime=0;const pr=s.play();if(pr)pr.catch(()=>{})}catch(e){}}
  const t=$("msg").textContent;
  const okMsg=()=>{ts.className="toast";ts.textContent="已複製，到 LINE 群組貼上即可";celebrate()};
@@ -540,7 +651,7 @@ const imgOK={};
  ci.addEventListener("error",()=>{imgOK[id]=false;if(!ci.hidden){ci.hidden=true;$("cheerMark").hidden=false}})});
 function celebrate(){
  const names=[$("who").value,$("who2").value].filter((v,i,a)=>v&&a.indexOf(v)===i).join("、");
- const left=all.filter(a=>!$(a.id).checked).length;
+ const left=need.filter(a=>!$(a.id).checked).length;
  $("cheerMark").textContent=left?"😭":"😊";
  const showCat=!left&&imgOK.cheerCat!==false,showSad=!!left&&imgOK.cheerSad!==false;
  $("cheerCat").hidden=!showCat;$("cheerSad").hidden=!showSad;$("cheerMark").hidden=showCat||showSad;
