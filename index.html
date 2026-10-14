@@ -595,7 +595,7 @@ render();
 
 // ===== 雙人同步（Firebase Realtime Database）=====
 // 填入資料庫網址就會開啟同步；留空則只存在各自手機
-const FB_URL="";
+const FB_URL="https://checklist-pm-15191-default-rtdb.asia-southeast1.firebasedatabase.app";
 const STORE="sanmin";
 // 不同步的欄位（金額只留在填表人的手機）
 const PRIVATE=k=>k==="day"||/^rev_|^x_|^d_/.test(k);
