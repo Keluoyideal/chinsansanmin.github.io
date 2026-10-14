@@ -153,6 +153,14 @@ button.go-fix{padding:8px 14px;font-size:.9rem;background:var(--warn);border-col
 .sec-count{font-size:.8rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 10px;white-space:nowrap}
 .sec-count.full{background:var(--accent);border-color:var(--accent);color:var(--surface)}
 .must .sec-count.full{background:var(--warn);border-color:var(--warn)}
+.item.ice .when{font-weight:700;font-variant-numeric:tabular-nums;margin-right:6px}
+.item.ice.due{background:var(--warn-soft)}
+.item.ice.due small{color:var(--warn);font-weight:700}
+.ice-alert{position:fixed;left:0;right:0;top:0;z-index:15;background:var(--warn);color:var(--surface);padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;box-shadow:0 4px 16px color-mix(in srgb,var(--fg) 25%,transparent)}
+.ice-in{max-width:528px;margin:0 auto;display:flex;align-items:center;gap:10px}
+.ice-in span{flex:1;font-weight:700;font-size:1rem}
+.ice-in button{padding:8px 14px;background:var(--surface);color:var(--warn);border-color:var(--surface)}
+.ice-in button.x{background:transparent;color:var(--surface);border-color:color-mix(in srgb,var(--surface) 60%,transparent);font-weight:500}
 main.wrap{padding-block-end:120px}
 main section{scroll-margin-top:84px}
 .todo-bar{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -4px 16px color-mix(in srgb,var(--fg) 10%,transparent);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
@@ -182,6 +190,7 @@ main section{scroll-margin-top:84px}
 @media (prefers-reduced-motion:reduce){.fill{transition:none}}
 </style>
 
+<div class="ice-alert" id="iceAlert" hidden role="alert"><div class="ice-in"><span id="iceAlertText">17:00 該補冰塊了</span><button type="button" id="iceAlertDo">已補</button><button type="button" class="x" id="iceAlertX" aria-label="稍後提醒">稍後</button></div></div>
 <div class="bar"><div class="wrap" style="padding-block:0;gap:0">
   <div class="bar-row"><h1>晚班收班 Checklist</h1><span class="bar-right"><span class="sync" id="syncState" hidden></span><span class="count" id="count">0/0</span></span></div>
   <div class="track"><div class="fill" id="fill"></div></div>
@@ -195,6 +204,12 @@ main section{scroll-margin-top:84px}
       <label class="f"><span>搭班 <span class="req">*</span></span><select id="who2"></select></label>
     </div>
     <p class="note">日期自動帶入。忙的時候可以按「整區完成」，完成的區會自動收起。</p>
+  </section>
+
+  <section id="iceSec">
+    <div class="sec-head"><h2>補冰塊</h2><button type="button" class="ghost sm" id="notifyBtn" hidden>開啟通知</button></div>
+    <div class="items" id="iceList"></div>
+    <p class="note">時間到會跳出提醒（頁面要開著）。打勾會自動記下收班人員的名字和時間。</p>
   </section>
 
   <p class="pledge">若收班有缺失，責任是共同承擔。</p>
@@ -350,7 +365,7 @@ DLV.forEach(([k])=>REV.push(`d_${k}_n`,`d_${k}_amt`));
 const firstEver=st.day===undefined;
 if(st.day!==today){
  Object.keys(st).forEach(k=>{if(/^c\d/.test(k)||invIds.includes(k)||REV.includes(k))delete st[k]});
- delete st.extra;delete st.brewExtra;delete st.dayType;st.orders=[];st.day=today;
+ delete st.extra;delete st.brewExtra;delete st.dayType;delete st.ice17;delete st.ice20;st.orders=[];st.day=today;
 }
 if(!Array.isArray(st.orders))st.orders=[];
 if(!Array.isArray(st.tags)){st.tags=[];delete st.tag}
@@ -451,6 +466,44 @@ function brewList(){
  return out;
 }
 
+// ===== 補冰塊 =====
+const ICE=[["ice17","17:00"],["ice20","20:00"]];
+const tpNow=()=>{const d=new Date(Date.now()+8*3600e3);return {date:new Date(Date.now()+(8-5)*3600e3).toISOString().slice(0,10),hm:d.toISOString().slice(11,16)}};
+function drawIce(){
+ const now=tpNow();
+ $("iceList").innerHTML=ICE.map(([k,t])=>{const v=st[k],ok=!!(v&&v.at),due=!ok&&now.date===today&&now.hm>=t;
+  return `<label class="item ice${due?" due":""}" for="box_${k}"><input type="checkbox" id="box_${k}" data-ice="${k}"${ok?" checked":""}><span><span class="when">${t}</span>補冰塊<small>${ok?`已補・${esc(v.by)} ${v.at}`:due?"時間到了，還沒補":"還沒到時間"}</small></span></label>`}).join("");
+}
+function markIce(k,on){
+ if(on){
+  const who=$("who").value;
+  if(!who){$("who").classList.add("missing");$("who").scrollIntoView({behavior:"smooth",block:"center"});
+   $("toast").className="toast err";$("toast").textContent="請先選收班人員（填表），補冰塊才會記下名字";drawIce();return false}
+  st[k]={by:who,at:tpNow().hm};
+ }else delete st[k];
+ save();render();checkIce();return true;
+}
+["who","who2"].forEach(id=>$(id).addEventListener("input",()=>{if($(id).value)$(id).classList.remove("missing")}));
+$("iceList").addEventListener("change",e=>{const t=e.target;if(!t.dataset.ice)return;markIce(t.dataset.ice,t.checked)});
+let iceSnooze={};
+function checkIce(){
+ const now=tpNow();let due=null;
+ if(now.date===today)for(const [k,t] of ICE){if(!(st[k]&&st[k].at)&&now.hm>=t&&!(iceSnooze[k]>Date.now())){due=[k,t]}}
+ const a=$("iceAlert");
+ if(!due){a.hidden=true;return}
+ const wasHidden=a.hidden;
+ $("iceAlertText").textContent=`${due[1]} 該補冰塊了 🧊`;a.dataset.k=due[0];a.hidden=false;
+ if(wasHidden){try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
+  try{if("Notification" in window&&Notification.permission==="granted")new Notification("補冰塊提醒",{body:`${due[1]} 該補冰塊了`,tag:"ice-"+due[0],icon:"apple-touch-icon.png"})}catch(e){}}
+}
+$("iceAlertDo").onclick=()=>{const k=$("iceAlert").dataset.k;if(k)markIce(k,true)};
+$("iceAlertX").onclick=()=>{const k=$("iceAlert").dataset.k;iceSnooze[k]=Date.now()+10*60e3;$("iceAlert").hidden=true};
+setInterval(()=>{checkIce();drawIce()},30e3);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){checkIce();drawIce()}});
+setTimeout(checkIce,800);
+try{if("Notification" in window&&Notification.permission==="default"){const nb=$("notifyBtn");nb.hidden=false;
+ nb.onclick=()=>{Notification.requestPermission().then(p=>{nb.hidden=true})}}}catch(e){}
+
 function render(){
  const done=need.filter(a=>$(a.id).checked);
  all.forEach(a=>$(a.id).closest(".item").classList.toggle("done",$(a.id).checked));
@@ -461,6 +514,7 @@ function render(){
   const ob=sec.querySelector(".open");ob.hidden=!ok;ob.textContent=show?"收起":"✓ 這區已完成，點此查看";
   sec.querySelector(".all").textContent=ok?"取消勾選":(g.must?"全部已關":"整區完成");
  });
+ drawIce();
  $("count").textContent=`${done.length}/${need.length}`;
  const remain=need.length-done.length;
  $("todoBar").hidden=remain===0;$("todoText").textContent=`還差 ${remain} 項沒勾`;
@@ -502,6 +556,7 @@ function render(){
  const expLines=[...dlvLines,...(other||xName?[`其他錢櫃支出：${xName||"（未填品項）"} $${fmt(other)}`]:[])];
  if(expLines.length)m+=`\n▍支出細項\n${expLines.join("\n")}\n`;
  m+=`\n${tagLine?tagLine+"\n":""}${brewAll.length?`明天${t==="we"?"假日":"平日"}要煮：`+brewAll.join("、"):`明天${t==="we"?"假日":"平日"}不用特別煮`}`;
+ m+=`\n\n▍補冰塊\n${ICE.map(([k,t])=>{const v=st[k];return v&&v.at?`${t} ✓ ${v.by} ${v.at}`:`${t} ⚠️ 未補`}).join("\n")}`;
  m+=`\n\n▍冰箱庫存\n${inv("foam")}`;
  const ords=st.orders.map(o=>{const its=o.items.filter(x=>x.cups||x.item).map(x=>`${x.cups}杯${x.item}`);
   return (o.no||o.time||its.length)?`你訂${o.no} ${o.time} ${its.join("、")}`.trim():null}).filter(Boolean);
@@ -722,6 +777,7 @@ $("reset").onclick=()=>{
  all.forEach(a=>{$(a.id).checked=false;delete st[a.id]});
  [...invIds,...REV].forEach(id=>{$(id).value="";delete st[id];$(id).classList.remove("missing")});
  ["extra","brewExtra"].forEach(id=>{$(id).value="";delete st[id]});
+ delete st.ice17;delete st.ice20;
  delete st.dayType;st.orders=[];drawOrders();
  document.querySelectorAll(".grp").forEach(s=>s.classList.remove("show"));
  save();render();armed=false;b.textContent="清空，開始新的一天";$("toast").textContent="";
