@@ -179,6 +179,14 @@ main section{scroll-margin-top:84px}
 .item.flash{animation:flash 1.4s ease-out}
 @keyframes flash{0%,40%{background:var(--warn-soft)}100%{background:transparent}}
 @media (prefers-reduced-motion:reduce){.item input.pop,.item.flash{animation:none}}
+.punish{position:fixed;inset:0;z-index:40;background:#0b0b0d;color:#f3f3f3;display:grid;place-items:center;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.punish-in{width:100%;max-width:720px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.punish-in h2{margin:0;font-size:1.3rem;color:#ff9f6e;letter-spacing:0}
+.punish-vid{position:relative;width:100%}
+.punish-vid video{display:block;width:100%;height:auto;max-height:65vh;background:#000;border-radius:10px}
+.punish-play{position:absolute;inset:0;margin:auto;width:max-content;height:max-content;background:#fff;color:#111;border:0;padding:12px 18px}
+.punish-in p{margin:0;font-size:.95rem;color:#c9c9cf;font-variant-numeric:tabular-nums}
+.punish-in .primary{flex:none;min-width:200px}
 .cheer{position:fixed;inset:0;z-index:20;background:color-mix(in srgb,var(--fg) 45%,transparent);display:grid;place-items:center;padding:16px}
 .cheer-card{background:var(--surface);border-radius:16px;padding:28px 22px 20px;max-width:340px;width:100%;text-align:center;display:flex;flex-direction:column;gap:10px;animation:pop .35s ease-out}
 .cheer-mark{font-size:2.6rem;line-height:1}
@@ -292,6 +300,16 @@ main section{scroll-margin-top:84px}
 
 <div class="todo-bar" id="todoBar" hidden>
   <div class="todo-in"><span id="todoText">還差 0 項沒勾</span><button type="button" id="todoGo">看看是哪項？</button></div>
+</div>
+
+<div class="punish" id="punish" hidden role="dialog" aria-modal="true" aria-labelledby="punishTitle">
+  <div class="punish-in">
+    <h2 id="punishTitle">還有幾項沒收完</h2>
+    <div class="punish-vid"><video id="punishVid" src="punish.mp4?v=1" playsinline webkit-playsinline preload="auto"></video>
+      <button type="button" class="punish-play" id="punishPlay" hidden>▶ 點這裡播放</button></div>
+    <p id="punishLeft">影片看完才能繼續收</p>
+    <button type="button" class="primary" id="punishDone" hidden>回去繼續收</button>
+  </div>
 </div>
 
 <div class="cheer" id="cheer" hidden role="dialog" aria-modal="true" aria-labelledby="cheerTitle">
@@ -702,8 +720,9 @@ $("copy").onclick=()=>{
  if(p.length){
   ts.className="toast err";ts.innerHTML=`<span>還沒填：${esc(p.join("；"))}</span><button type="button" class="go-fix" id="goFix">前往填寫 ↑</button>`;
   $("goFix").onclick=goMissing;return}
- {const done=need.every(a=>$(a.id).checked);restartAnim(done?"cheerCat":"cheerSad");
-  const s=$(done?"cheerSnd":"sadSnd");try{s.currentTime=0;const pr=s.play();if(pr)pr.catch(()=>{})}catch(e){}}
+ {const done=need.every(a=>$(a.id).checked);
+  if(done){restartAnim("cheerCat");const s=$("cheerSnd");try{s.currentTime=0;const pr=s.play();if(pr)pr.catch(()=>{})}catch(e){}}
+  else startPunish();}
  const t=$("msg").textContent;
  const okMsg=()=>{ts.className="toast";ts.textContent="已複製，到 LINE 群組貼上即可";celebrate()};
  const selectMsg=()=>{const r=document.createRange();r.selectNodeContents($("msg"));const s=getSelection();s.removeAllRanges();s.addRange(r);ts.className="toast";ts.textContent="已選取文字，請長按複製";["cheerSnd","sadSnd"].forEach(id=>{try{$(id).pause()}catch(e){}})};
@@ -728,9 +747,38 @@ const imgOK={};
 ["cheerCat","cheerSad"].forEach(id=>{const ci=$(id);imgOK[id]=ci.complete?ci.naturalWidth>0:null;
  ci.addEventListener("load",()=>imgOK[id]=true);
  ci.addEventListener("error",()=>{imgOK[id]=false;if(!ci.hidden){ci.hidden=true;$("cheerMark").hidden=false}})});
+// ===== 沒收完：看完影片才能繼續 =====
+let punishOK=true,punishActive=false;
+const pv=$("punishVid");
+pv.addEventListener("error",()=>{punishOK=false});
+const punishOn=()=>punishActive;
+function startPunish(){
+ if(!punishOK){const s=$("sadSnd");restartAnim("cheerSad");try{s.currentTime=0;const pr=s.play();if(pr)pr.catch(()=>{})}catch(e){}return}
+ punishActive=true;
+ const left=need.filter(a=>!$(a.id).checked).length;
+ $("punishTitle").textContent=`還有 ${left} 項沒收完`;
+ $("punishDone").hidden=true;$("punishPlay").hidden=true;$("punishLeft").textContent="影片看完才能繼續收";
+ $("punish").hidden=false;document.body.style.overflow="hidden";
+ try{pv.currentTime=0}catch(e){}
+ const pr=pv.play();if(pr)pr.catch(()=>{$("punishPlay").hidden=false});
+}
+pv.addEventListener("timeupdate",()=>{if(!pv.duration)return;const r=Math.max(0,Math.ceil(pv.duration-pv.currentTime));$("punishLeft").textContent=`看完才能繼續收・還剩 ${r} 秒`});
+pv.addEventListener("pause",()=>{if(punishActive&&!pv.ended&&!document.hidden)$("punishPlay").hidden=false});
+pv.addEventListener("play",()=>{$("punishPlay").hidden=true});
+pv.addEventListener("ended",()=>{$("punishLeft").textContent="看完了，回去把沒勾的收好吧";$("punishDone").hidden=false;$("punishDone").focus()});
+$("punishPlay").onclick=()=>{const pr=pv.play();if(pr)pr.catch(()=>{})};
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&punishActive&&!pv.ended){const pr=pv.play();if(pr)pr.catch(()=>{$("punishPlay").hidden=false})}});
+$("punishDone").onclick=()=>{
+ punishActive=false;$("punish").hidden=true;document.body.style.overflow="";
+ const a=need.find(x=>!$(x.id).checked);if(!a)return;
+ const row=$(a.id).closest(".item");reveal(row);
+ setTimeout(()=>{row.scrollIntoView({behavior:"auto",block:"center"});row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash")},50);
+};
+
 function celebrate(){
  const names=[$("who").value,$("who2").value].filter((v,i,a)=>v&&a.indexOf(v)===i).join("、");
  const left=need.filter(a=>!$(a.id).checked).length;
+ if(left&&punishOn())return;
  $("cheerMark").textContent=left?"😭":"😊";
  const showCat=!left&&imgOK.cheerCat!==false,showSad=!!left&&imgOK.cheerSad!==false;
  $("cheerCat").hidden=!showCat;$("cheerSad").hidden=!showSad;$("cheerMark").hidden=showCat||showSad;
