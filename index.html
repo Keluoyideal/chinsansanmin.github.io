@@ -161,6 +161,13 @@ button.go-fix{padding:8px 14px;font-size:.9rem;background:var(--warn);border-col
 .ice-in span{flex:1;font-weight:700;font-size:1rem}
 .ice-in button{padding:8px 14px;background:var(--surface);color:var(--warn);border-color:var(--surface)}
 .ice-in button.x{background:transparent;color:var(--surface);border-color:color-mix(in srgb,var(--surface) 60%,transparent);font-weight:500}
+.tabs{position:sticky;top:calc(env(safe-area-inset-top,0px) + 58px);z-index:4;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 2px 8px color-mix(in srgb,var(--fg) 6%,transparent)}
+.tabs button{border:0;border-radius:9px;padding:11px 8px;background:transparent;color:var(--muted);font-size:1rem}
+.tabs button.on{background:var(--accent);color:var(--surface)}
+.tab-n{font-size:.78rem;font-weight:500;opacity:.85;font-variant-numeric:tabular-nums}
+.tab{display:flex;flex-direction:column;gap:22px}
+.next-tab{padding:14px 16px;font-size:1rem}
+.todo-bar.off{display:none}
 main.wrap{padding-block-end:120px}
 main section{scroll-margin-top:84px}
 .todo-bar{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -4px 16px color-mix(in srgb,var(--fg) 10%,transparent);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
@@ -206,6 +213,12 @@ main section{scroll-margin-top:84px}
     <p class="note">日期自動帶入。忙的時候可以按「整區完成」，完成的區會自動收起。</p>
   </section>
 
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" data-tab="check" id="tabBtnCheck">收班檢查 <span class="tab-n" id="tabCheckN"></span></button>
+    <button type="button" role="tab" data-tab="money" id="tabBtnMoney">營收交班</button>
+  </div>
+
+  <div class="tab" id="tab-check">
   <section id="iceSec">
     <div class="sec-head"><h2>補冰塊</h2><button type="button" class="ghost sm" id="notifyBtn" hidden>開啟通知</button></div>
     <div class="items" id="iceList"></div>
@@ -216,6 +229,15 @@ main section{scroll-margin-top:84px}
 
   <div id="lists"></div>
 
+  <section>
+    <h2>冰箱庫存（奶蓋） <span class="req">*</span></h2>
+    <div class="inv" id="inv-foam"></div>
+    <p class="note">低於門檻會標橘色：平日海鹽低於 1.5、蕎麥低於 1；假日海鹽低於 1、蕎麥低於 0.5（<span id="dayLabel"></span>）。</p>
+  </section>
+    <button type="button" class="primary next-tab" data-go="money">下一步：營收交班 →</button>
+  </div>
+
+  <div class="tab" id="tab-money" hidden>
   <section>
     <h2>營收 <span class="req">*</span></h2>
     <div class="rev">
@@ -237,22 +259,6 @@ main section{scroll-margin-top:84px}
   </section>
 
   <section>
-    <h2>冰箱庫存（奶蓋） <span class="req">*</span></h2>
-    <div class="inv" id="inv-foam"></div>
-  </section>
-
-  <section>
-    <div class="sec-head"><h2>明天要煮（自動判斷）</h2>
-      <span class="lbl" id="dayLabel"></span>
-    </div>
-    <div class="brew" id="brew"></div>
-    <p class="note">鍋煮茶當天煮完不留，只看奶蓋：<br>平日海鹽低於 1.5、蕎麥低於 1；假日海鹽低於 1、蕎麥低於 0.5。明天是平日還是假日由系統自動判斷。</p>
-    <label class="f">其他要煮（選填）<input type="text" id="brewExtra" placeholder="例：多煮兩倍蕎麥"></label>
-    <div class="lbl">提醒對象（點選，可多選）</div>
-    <div class="chips" id="tags"></div>
-  </section>
-
-  <section>
     <h2>外送訂單備註</h2>
     <div id="orders" style="display:flex;flex-direction:column;gap:10px"></div>
     <div><button type="button" class="ghost" id="addOrder">＋ 新增一筆訂單</button></div>
@@ -264,16 +270,23 @@ main section{scroll-margin-top:84px}
   </section>
 
   <section>
+    <h2>提醒對象</h2>
+    <div class="lbl">交班訊息會 @ 這些人（點選，可多選）</div>
+    <div class="chips" id="tags"></div>
+  </section>
+
+  <section>
     <h2>交班訊息</h2>
     <div class="out">
       <pre id="msg"></pre>
       <div class="btns"><button class="primary" id="copy">複製，貼到 LINE 群組</button></div>
       <div class="toast" id="toast" role="status"></div>
     </div>
-    <p class="note">貼到群組就有時間和人名，等於電子留底。勾選內容只存在這支手機。</p>
+    <p class="note">貼到群組就有時間和人名，等於電子留底。</p>
   </section>
 
   <div class="btns"><button class="danger" id="reset">清空，開始新的一天</button></div>
+  </div>
 </main>
 
 <div class="todo-bar" id="todoBar" hidden>
@@ -398,7 +411,7 @@ $("lists").addEventListener("change",e=>{
 });
 $("todoGo").onclick=()=>{
  const a=need.find(x=>!$(x.id).checked);if(!a)return;
- const row=$(a.id).closest(".item");
+ const row=$(a.id).closest(".item");reveal(row);
  row.scrollIntoView({behavior:calm()?"auto":"smooth",block:"center"});
  row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash");
 };
@@ -418,7 +431,7 @@ $("tags").onclick=e=>{const b=e.target.closest(".chip");if(!b)return;const n=b.d
  b.setAttribute("aria-pressed",st.tags.includes(n));save();render()};
 
 delete st.dayType;
-$("dayLabel").textContent=`明天週${"日一二三四五六"[tmrDow]}・${holidayName?holidayName+"・":""}${autoType==="we"?"假日":"平日"}`;
+$("dayLabel").textContent=`明天週${"日一二三四五六"[tmrDow]}・${holidayName?holidayName+"・":""}${autoType==="we"?"假日":"平日"}標準`;
 
 // orders
 const newOrder=()=>({no:"",time:"",items:[{cups:"",item:""}]});
@@ -465,6 +478,20 @@ function brewList(){
   const low=v!==null&&(potTea?v<=lim:v<lim);$(`L_${k}_${n}`).classList.toggle("low",low);if(low)out.push(n)});
  return out;
 }
+
+// ===== 分頁 =====
+const TABKEY="closing-tab";
+function showTab(t,scroll){
+ ["check","money"].forEach(n=>{$("tab-"+n).hidden=n!==t;const b=document.querySelector(`.tabs [data-tab="${n}"]`);b.setAttribute("aria-selected",n===t);b.classList.toggle("on",n===t)});
+ $("todoBar").classList.toggle("off",t!=="check");
+ try{localStorage.setItem(TABKEY,t)}catch(e){}
+ if(scroll){const tb=document.querySelector(".tabs"),bar=document.querySelector(".bar");const y=$("tab-"+t).getBoundingClientRect().top+scrollY-bar.offsetHeight-tb.offsetHeight-16;if(scrollY>y)scrollTo({top:Math.max(0,y)})}
+}
+document.querySelectorAll(".tabs [data-tab]").forEach(b=>b.onclick=()=>showTab(b.dataset.tab,true));
+document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>showTab(b.dataset.go,true));
+const tabOf=el=>el&&el.closest(".tab")?el.closest(".tab").id.slice(4):null;
+const reveal=el=>{const t=tabOf(el);if(t&&$("tab-"+t).hidden)showTab(t,false)};
+{let t0="check";try{t0=localStorage.getItem(TABKEY)||"check"}catch(e){}showTab(t0==="money"?"money":"check",false)}
 
 // ===== 補冰塊 =====
 const ICE=[["ice17","17:00"],["ice20","20:00"]];
@@ -516,13 +543,13 @@ function render(){
  });
  drawIce();
  $("count").textContent=`${done.length}/${need.length}`;
+ $("tabCheckN").textContent=`${done.length}/${need.length}`;
  const remain=need.length-done.length;
  $("todoBar").hidden=remain===0;$("todoText").textContent=`還差 ${remain} 項沒勾`;
  $("fill").style.width=(done.length/need.length*100)+"%";
 
  const t=autoType;
- const brew=brewList();const extraBrew=$("brewExtra").value.trim();
- $("brew").innerHTML=brew.length?brew.map(n=>`<span class="pill">${n}</span>`).join(""):`<span class="note">明天${t==="we"?"假日":"平日"}不用特別煮</span>`;
+ brewList();
 
  const d=$("date").value.replace(/^\d{4}-/,"").replace("-","/");
  const ppl="";
@@ -533,7 +560,6 @@ function render(){
  let m=`【${d} 晚班收班】\n${crew}`;
  m+=miss.length?`收班檢查 ${done.length}/${need.length}，未完成：\n${miss.map(x=>"⚠️ "+x).join("\n")}\n`:`收班檢查 ${need.length}/${need.length} 全部完成 ✅\n`;
  const tagLine=st.tags.map(n=>"@"+LINE[n]).join(" ");
- const brewAll=[...brew,...(extraBrew?[extraBrew]:[])];
  const money=id=>{const v=$(id).value.replace(/[,\s$]/g,"");return v===""||isNaN(+v)?null:Math.round(+v)};
  const fmt=n=>n.toLocaleString("en-US");
  const rs=money("rev_sales"),ra=money("rev_act");
@@ -555,7 +581,7 @@ function render(){
  m+=`\n▍營收\n現金營收：${rs!==null?"$"+fmt(rs):"?"}\n現金支出：$${fmt(re)}\n實際收入：${ra!==null?"$"+fmt(ra):"?"}\n差額：${diffTxt||"?"}\n`;
  const expLines=[...dlvLines,...(other||xName?[`其他錢櫃支出：${xName||"（未填品項）"} $${fmt(other)}`]:[])];
  if(expLines.length)m+=`\n▍支出細項\n${expLines.join("\n")}\n`;
- m+=`\n${tagLine?tagLine+"\n":""}${brewAll.length?`明天${t==="we"?"假日":"平日"}要煮：`+brewAll.join("、"):`明天${t==="we"?"假日":"平日"}不用特別煮`}`;
+ if(tagLine)m+=`\n${tagLine}`;
  m+=`\n\n▍補冰塊\n${ICE.map(([k,t])=>{const v=st[k];return v&&v.at?`${t} ✓ ${v.by} ${v.at}`:`${t} ⚠️ 未補`}).join("\n")}`;
  m+=`\n\n▍冰箱庫存\n${inv("foam")}`;
  const ords=st.orders.map(o=>{const its=o.items.filter(x=>x.cups||x.item).map(x=>`${x.cups}杯${x.item}`);
@@ -766,7 +792,7 @@ const closeCheer=()=>{$("cheer").hidden=true;["cheerSnd","sadSnd"].forEach(id=>{
 $("cheerClose").onclick=closeCheer;
 $("cheer").onclick=e=>{if(e.target.id==="cheer")closeCheer()};
 function goMissing(){
- const el=document.querySelector("main .missing");if(!el)return;
+ const el=document.querySelector("main .missing");if(!el)return;reveal(el);
  el.scrollIntoView({behavior:calm()?"auto":"smooth",block:"center"});
  setTimeout(()=>{try{el.focus({preventScroll:true})}catch(e){el.focus()}},calm()?0:400);
 }
@@ -776,7 +802,7 @@ $("reset").onclick=()=>{
  if(!armed){armed=true;b.textContent="再按一次確認清空";setTimeout(()=>{armed=false;b.textContent="清空，開始新的一天"},3000);return}
  all.forEach(a=>{$(a.id).checked=false;delete st[a.id]});
  [...invIds,...REV].forEach(id=>{$(id).value="";delete st[id];$(id).classList.remove("missing")});
- ["extra","brewExtra"].forEach(id=>{$(id).value="";delete st[id]});
+ ["extra"].forEach(id=>{$(id).value="";delete st[id]});
  delete st.ice17;delete st.ice20;
  delete st.dayType;st.orders=[];drawOrders();
  document.querySelectorAll(".grp").forEach(s=>s.classList.remove("show"));
