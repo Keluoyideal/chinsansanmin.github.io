@@ -278,11 +278,7 @@ main section{scroll-margin-top:84px}
     <textarea id="extra" placeholder="今日狀況、支出、其他要交接的事項"></textarea>
   </section>
 
-  <section>
-    <h2>提醒對象</h2>
-    <div class="lbl">交班訊息會 @ 這些人（點選，可多選）</div>
-    <div class="chips" id="tags"></div>
-  </section>
+  <div class="chips" id="tags" hidden></div>
 
   <section>
     <h2>交班訊息</h2>
@@ -600,7 +596,6 @@ function render(){
  m+=`\n▍營收\n現金營收：${rs!==null?"$"+fmt(rs):"?"}\n現金支出：$${fmt(re)}\n實際收入：${ra!==null?"$"+fmt(ra):"?"}\n差額：${diffTxt||"?"}\n`;
  const expLines=[...dlvLines,...(other||xName?[`其他錢櫃支出：${xName||"（未填品項）"} $${fmt(other)}`]:[])];
  if(expLines.length)m+=`\n▍支出細項\n${expLines.join("\n")}\n`;
- if(tagLine)m+=`\n${tagLine}`;
  m+=`\n\n▍補冰塊\n${ICE.map(([k,t])=>{const v=st[k];return v&&v.at?`${t} ✓ ${v.by} ${v.at}`:`${t} ⚠️ 未補`}).join("\n")}`;
  m+=`\n\n▍冰箱庫存\n${inv("foam")}`;
  const ords=st.orders.map(o=>{const its=o.items.filter(x=>x.cups||x.item).map(x=>`${x.cups}杯${x.item}`);
@@ -613,7 +608,8 @@ function render(){
 // ===== 後場效期板：讀當天的煮量與報廢，接在交班訊息後面 =====
 // 資料由效期板寫在 Firestore 的 shops/{店號}/reports/{日期}；這裡用匿名登入讀取。
 const TB={key:"AIzaSyBTfrP7-X14xxRzZEWOEDin7PwzrBIv8xU",project:"tea-board-c32f9",shop:"sanmin0110"};
-const tb={text:"",day:null,busy:false};
+const tb={text:"",pending:[],day:null,busy:false};
+const TB_URL="https://keluoyideal.github.io/Tea-Board/";
 async function tbToken(){
  const K="tea-board-auth";let a=null;try{a=JSON.parse(localStorage.getItem(K))}catch(e){}
  if(a&&a.exp>Date.now()+60e3)return a.id;
@@ -628,8 +624,10 @@ async function tbFetch(){
  if(tb.busy)return;tb.busy=true;const day=$("date").value;
  try{const tok=await tbToken();
   const r=await fetch(`https://firestore.googleapis.com/v1/projects/${TB.project}/databases/(default)/documents/shops/${TB.shop}/reports/${day}`,{headers:{Authorization:"Bearer "+tok}});
-  const text=r.ok?((await r.json()).fields?.body?.stringValue||""):r.status===404?"":tb.text;
-  if(text!==tb.text||day!==tb.day){tb.text=text;tb.day=day;render()}
+  let text=tb.text,pending=tb.pending;
+  if(r.ok){const f=(await r.json()).fields||{};text=f.body?.stringValue||"";pending=(f.pending?.arrayValue?.values||[]).map(v=>v.stringValue).filter(Boolean)}
+  else if(r.status===404){text="";pending=[]}
+  if(text!==tb.text||day!==tb.day||pending.join()!==tb.pending.join()){tb.text=text;tb.pending=pending;tb.day=day;render()}
  }catch(e){}finally{tb.busy=false}
 }
 render();
@@ -730,6 +728,7 @@ const PRIVATE=k=>k==="day"||/^rev_|^x_|^d_/.test(k);
 function problems(){
  const p=[];
  ["who","who2"].forEach(id=>$(id).classList.toggle("missing",!$(id).value));
+ if(tb.pending.length)p.push(`效期板還沒報廢完（${tb.pending.join("、")}）`);
  if(!$("who").value)p.push("收班人員");
  if(!$("who2").value)p.push("搭班");
  else if($("who2").value===$("who").value)p.push("搭班要選不同人");
@@ -744,8 +743,10 @@ function problems(){
 $("copy").onclick=()=>{
  const p=problems();const ts=$("toast");
  if(p.length){
-  ts.className="toast err";ts.innerHTML=`<span>還沒填：${esc(p.join("；"))}</span><button type="button" class="go-fix" id="goFix">前往填寫 ↑</button>`;
-  $("goFix").onclick=goMissing;return}
+  const onlyTb=p.length===1&&tb.pending.length;
+  ts.className="toast err";ts.innerHTML=onlyTb?`<span>${esc(p[0])}，請先到效期板處理完再交班</span><a class="go-fix" href="${TB_URL}" target="_blank" rel="noopener">開效期板 ↗</a>`
+   :`<span>還沒填：${esc(p.join("；"))}</span><button type="button" class="go-fix" id="goFix">前往填寫 ↑</button>`;
+  if(!onlyTb)$("goFix").onclick=goMissing;tbFetch();return}
  {const done=need.every(a=>$(a.id).checked);
   if(done){restartAnim("cheerCat");const s=$("cheerSnd");try{s.currentTime=0;const pr=s.play();if(pr)pr.catch(()=>{})}catch(e){}}
   else startPunish();}
