@@ -606,10 +606,36 @@ function render(){
  const ords=st.orders.map(o=>{const its=o.items.filter(x=>x.cups||x.item).map(x=>`${x.cups}杯${x.item}`);
   return (o.no||o.time||its.length)?`你訂${o.no} ${o.time} ${its.join("、")}`.trim():null}).filter(Boolean);
  if(ords.length)m+=`\n\n▍外送訂單備註\n${ords.join("\n")}`;
+ if(tb.text)m+=`\n\n▍茶湯・珍珠・配料（效期板）\n${tb.text}`;
  if($("extra").value.trim())m+=`\n\n▍其他備註\n${$("extra").value.trim()}`;
  $("msg").textContent=m;
 }
+// ===== 後場效期板：讀當天的煮量與報廢，接在交班訊息後面 =====
+// 資料由效期板寫在 Firestore 的 shops/{店號}/reports/{日期}；這裡用匿名登入讀取。
+const TB={key:"AIzaSyBTfrP7-X14xxRzZEWOEDin7PwzrBIv8xU",project:"tea-board-c32f9",shop:"sanmin0110"};
+const tb={text:"",day:null,busy:false};
+async function tbToken(){
+ const K="tea-board-auth";let a=null;try{a=JSON.parse(localStorage.getItem(K))}catch(e){}
+ if(a&&a.exp>Date.now()+60e3)return a.id;
+ let r;
+ if(a&&a.refresh){r=await fetch(`https://securetoken.googleapis.com/v1/token?key=${TB.key}`,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"grant_type=refresh_token&refresh_token="+encodeURIComponent(a.refresh)});
+  if(r.ok){const j=await r.json();a={id:j.id_token,refresh:j.refresh_token,exp:Date.now()+(+j.expires_in)*1000};try{localStorage.setItem(K,JSON.stringify(a))}catch(e){}return a.id}}
+ r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${TB.key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({returnSecureToken:true})});
+ if(!r.ok)throw new Error("auth");const j=await r.json();
+ a={id:j.idToken,refresh:j.refreshToken,exp:Date.now()+(+j.expiresIn)*1000};try{localStorage.setItem(K,JSON.stringify(a))}catch(e){}return a.id;
+}
+async function tbFetch(){
+ if(tb.busy)return;tb.busy=true;const day=$("date").value;
+ try{const tok=await tbToken();
+  const r=await fetch(`https://firestore.googleapis.com/v1/projects/${TB.project}/databases/(default)/documents/shops/${TB.shop}/reports/${day}`,{headers:{Authorization:"Bearer "+tok}});
+  const text=r.ok?((await r.json()).fields?.body?.stringValue||""):r.status===404?"":tb.text;
+  if(text!==tb.text||day!==tb.day){tb.text=text;tb.day=day;render()}
+ }catch(e){}finally{tb.busy=false}
+}
 render();
+tbFetch();setInterval(tbFetch,60e3);
+$("date").addEventListener("input",tbFetch);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")tbFetch()});
 
 // ===== 雙人同步（Firebase Realtime Database）=====
 // 填入資料庫網址就會開啟同步；留空則只存在各自手機
